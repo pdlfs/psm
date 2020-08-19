@@ -61,7 +61,7 @@ ifdef SCIF_ROOT_DIR
 endif
 
 PSM_HAVE_SCIF ?= $(shell printf '\#include <scif.h>\nint main(void){return(0);}\n' | \
-	$(CC) $(CFLAGS) $(LDFLAGS) -x c - -o /dev/null &> /dev/null && echo 1 || echo 0)
+	$(CC) $(CFLAGS) $(LDFLAGS) -x c - -o /dev/null > /dev/null 2>&1 && echo 1 || echo 0)
 
 ifeq (1,$(PSM_HAVE_SCIF))
 	SCIF_INCLUDE_FLAGS += -DPSM_HAVE_SCIF=1
