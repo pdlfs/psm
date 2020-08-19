@@ -978,7 +978,7 @@ __psm_ep_open(psm_uuid_t const unique_job_key, struct psm_ep_open_opts const *op
     int i, num_rails = 0;
     char *uname = "IPATH_UNIT";
     char *pname = "IPATH_PORT";
-    char uvalue[4], pvalue[4];
+    char uvalue[16], pvalue[16];
     int devid_enabled[PTL_MAX_INIT];
     union psmi_envvar_val devs;
 
@@ -1009,8 +1009,8 @@ __psm_ep_open(psm_uuid_t const unique_job_key, struct psm_ep_open_opts const *op
 
 	/* If multi-rail is used, set the first ep unit/port */
 	if (num_rails > 0) {
-	    snprintf(uvalue, 4, "%1d", units[0]);
-	    snprintf(pvalue, 4, "%1d", ports[0]);
+	    snprintf(uvalue, sizeof(uvalue), "%1d", units[0]);
+	    snprintf(pvalue, sizeof(pvalue), "%1d", ports[0]);
 	    setenv(uname, uvalue, 1);
 	    setenv(pname, pvalue, 1);
 	}
@@ -1037,8 +1037,8 @@ __psm_ep_open(psm_uuid_t const unique_job_key, struct psm_ep_open_opts const *op
 
     if (psmi_device_is_enabled(devid_enabled, PTL_DEVID_IPS)) {
 	for (i = 1; i < num_rails; i++) {
-	    snprintf(uvalue, 4, "%1d", units[i]);
-	    snprintf(pvalue, 4, "%1d", ports[i]);
+	    snprintf(uvalue, sizeof(uvalue), "%1d", units[i]);
+	    snprintf(pvalue, sizeof(pvalue), "%1d", ports[i]);
 	    setenv(uname, uvalue, 1);
 	    setenv(pname, pvalue, 1);
 
