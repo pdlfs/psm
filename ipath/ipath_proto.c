@@ -37,6 +37,7 @@
 // level infinipath protocol code.
 
 #include <sys/poll.h>
+#include <sys/sysmacros.h>  /* for minor() */
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <stdint.h>
