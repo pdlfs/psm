@@ -1349,7 +1349,7 @@ psmi_parse_devices(int devices[PTL_MAX_INIT], const char *devstring)
 
     b_new = (char *) devstr;
     e = b_new + len;
-    strncpy(e, devstring, len-1);
+    memcpy(e, devstring, len-1);
     e[len-1] = '\0';
     ee = e + len;
     i = 0;
