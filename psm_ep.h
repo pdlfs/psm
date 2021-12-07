@@ -152,7 +152,7 @@ struct psm_ep {
     ptl_ctl_t	ptl_self;
 
     /* All ptl data is allocated inline below */
-    uint8_t ptl_base_data[0] __attribute__((aligned(8)));
+    uint8_t ptl_base_data[0] __attribute__((aligned(16)));
 };
 
 struct mqq {

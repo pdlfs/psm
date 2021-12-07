@@ -1008,6 +1008,12 @@ psmi_faultinj_is_fault(struct psmi_faultinj_spec *fi)
 
 /*
  * Log memory increments or decrements of type memstats_t.
+ * Compilers like gcc assume malloc()'d memory is aligned to 16 byte
+ * boundaries on 64 bit systems and may use SSE instructions that
+ * require this to access structures.  Since this structure is
+ * prepended to malloc()'d memory allocations it must be a multiple
+ * of 16 in size in order preserve malloc alignment and avoid possible
+ * SEGVs when SSE instructions are used (e.g. with -O3).
  */
 struct psmi_memtype_hdr {
     struct {
@@ -1015,6 +1021,8 @@ struct psmi_memtype_hdr {
 	uint64_t	magic : 8;
 	uint64_t	type : 8;
     };
+    /* use orig alloc ptr if add psmi_memalign_internal() from psm2 */
+    void *original_allocation;   /* from psm2 */
 };
 
 struct psmi_stats_malloc psmi_stats_memory;
@@ -1058,7 +1066,13 @@ psmi_log_memstats(psmi_memtype_t type, int64_t nbytes)
     return;
 }
 
+// Memory stats will only be collected under debug builds
+
+#ifdef PSM_DEBUG
 #define psmi_stats_mask PSMI_STATSTYPE_MEMORY
+#else
+#define psmi_stats_mask 0
+#endif
 
 #ifdef malloc
 #undef malloc
@@ -1070,7 +1084,7 @@ psmi_malloc_internal(psm_ep_t ep, psmi_memtype_t type,
     size_t newsz = sz;
     void *newa;
 
-    psmi_assert(sizeof(struct psmi_memtype_hdr) == 8);
+    psmi_assert((sizeof(struct psmi_memtype_hdr) % 16) == 0);
 
     if_pf (psmi_stats_mask & PSMI_STATSTYPE_MEMORY)
 	newsz += sizeof(struct psmi_memtype_hdr);
@@ -1087,6 +1101,7 @@ psmi_malloc_internal(psm_ep_t ep, psmi_memtype_t type,
 	hdr->size = newsz;
 	hdr->type = type;
 	hdr->magic = 0x8c;
+	hdr->original_allocation = newa;
 	psmi_log_memstats(type, newsz);
 	newa = (void *) (hdr + 1);
 	//_IPATH_INFO("alloc is %p\n", newa);
@@ -1138,7 +1153,7 @@ psmi_free_internal(void *ptr)
 	int magic = (int) hdr->magic;
 	psmi_log_memstats(type, -size);
 	psmi_assert_always(magic == 0x8c);
-	ptr = (void *) hdr;
+	ptr = hdr->original_allocation;
     }
     free(ptr);
 }
