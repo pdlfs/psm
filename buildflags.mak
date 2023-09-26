@@ -44,6 +44,7 @@ CC ?= gcc
 
 SCIF_LINK_FLAGS :=
 SCIF_INCLUDE_FLAGS :=
+CMA_INCLUDE_FLAGS :=
 
 compiler_arch := $(shell $(CC) -dumpmachine || echo "none")
 ifeq ($(compiler_arch),none)
@@ -68,9 +69,16 @@ ifeq (1,$(PSM_HAVE_SCIF))
 	SCIF_LINK_FLAGS += -lscif
 endif
 
+PSM_HAVE_CMA ?= $(shell printf '\#include <stddef.h>\n\#include <sys/uio.h>\nint main(void){return(process_vm_readv(0, NULL, 0, NULL, 0, 0));}\n' | \
+	$(CC) $(CFLAGS) $(LDFLAGS) -x c - -o /dev/null > /dev/null 2>&1 && echo 1 || echo 0)
+
+ifeq (1,$(PSM_HAVE_CMA))
+	CMA_INCLUDE_FLAGS += -DPSM_USE_CMA=1
+endif
+
 WERROR := -Werror
 INCLUDES := -I. -I$(top_srcdir)/include -I$(top_srcdir)/mpspawn \
-	-I$(top_srcdir)/include/$(os)-$(arch) $(SCIF_INCLUDE_FLAGS)
+	-I$(top_srcdir)/include/$(os)-$(arch) $(SCIF_INCLUDE_FLAGS) $(CMA_INCLUDE_FLAGS)
 BASECFLAGS += $(BASE_FLAGS) $(if $(MIC:0=),$(if $(filter $(CC),icc),-mmic,-D__MIC__)) \
 	-Wall $(WERROR) $(if $(MIC:0=),-Wno-unused) -fpic -fPIC -D_GNU_SOURCE \
 	$(if $(filter $(CC),icc),,-funwind-tables) $(if $(PSM_PROFILE:0=),-DPSM_PROFILE) \

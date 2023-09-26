@@ -37,6 +37,72 @@
 
 #include "kcopyrw.h"
 
+#ifdef PSM_USE_CMA
+
+#include <sys/uio.h>
+
+/*
+ * use more modern CMA process_vm_readv/process_vm_writev API to emulate
+ * old kcopy API.  CMA does not need/use the fd arg.
+ */
+
+int64_t kcopy_get(int fd, pid_t pid, const void *src, void *dst, int64_t n) {
+  ssize_t rv, got;
+  struct iovec local_iov;   /* dst buffer (in my proc) */
+  struct iovec remote_iov;  /* src buffer (in pid proc) */
+  local_iov.iov_base = dst;
+  remote_iov.iov_base = (void *)src;   /* cast off const */
+  local_iov.iov_len = remote_iov.iov_len = n;
+
+  got = 0;
+  while (got < n) {
+    rv = process_vm_readv(pid, &local_iov, 1, &remote_iov, 1, 0);
+    if (rv < 0)
+      return rv;    /* errored out */
+    got += rv;
+    local_iov.iov_base += rv;
+    local_iov.iov_len -= rv;
+    remote_iov.iov_base += rv;
+    remote_iov.iov_len -= rv;
+  }
+
+  return got;
+}
+
+int64_t kcopy_put(int fd, const void *src, pid_t pid, void *dst, int64_t n) {
+  ssize_t rv, got;
+  struct iovec local_iov;   /* src buffer (in my proc) */
+  struct iovec remote_iov;  /* dst buffer (in pid proc) */
+  local_iov.iov_base = (void *)src;    /* cast off const */
+  remote_iov.iov_base = dst;
+  local_iov.iov_len = remote_iov.iov_len = n;
+
+  got = 0;
+  while (got < n) {
+    rv = process_vm_writev(pid, &local_iov, 1, &remote_iov, 1, 0);
+    if (rv < 0)
+      return rv;    /* errored out */
+    got += rv;
+    local_iov.iov_base += rv;
+    local_iov.iov_len -= rv;
+    remote_iov.iov_base += rv;
+    remote_iov.iov_len -= rv;
+  }
+
+  return got;
+}
+
+int kcopy_abi(int fd) {    /* never called by PSM, so not used */
+  return 0;
+}
+
+int kcopy_cma_is_ok() {
+  int rv = process_vm_readv(getpid(), NULL, 0, NULL, 0, 0);
+  return (rv == 0);
+}
+
+#else /* PSM_USE_CMA */
+
 #define KCOPY_GET_SYSCALL 1
 #define KCOPY_PUT_SYSCALL 2
 #define KCOPY_ABI_SYSCALL 3
@@ -103,3 +169,5 @@ int kcopy_abi(int fd) {
 
 	return ret;
 }
+
+#endif

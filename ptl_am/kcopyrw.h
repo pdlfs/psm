@@ -48,3 +48,10 @@ int64_t kcopy_put(int fd, const void *src, pid_t pid, void *dst, int64_t n);
  * return the ABI version or -1 on error
  */
 int kcopy_abi(int fd);
+
+#ifdef PSM_USE_CMA
+/*
+ * check if basic CMA system call works.
+ */
+int kcopy_cma_is_ok(void);
+#endif

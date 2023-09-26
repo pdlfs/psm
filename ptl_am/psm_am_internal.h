@@ -88,7 +88,8 @@ typedef struct psmi_handlertab {
 #define PSMI_KASSIST_KNEM      0xC
 #define PSMI_KASSIST_GET       0x15
 #define PSMI_KASSIST_PUT       0x2A
-#define PSMI_KASSIST_MASK      0x3F
+#define PSMI_KASSIST_KCOPY_CMA 0x40   /* using CMA API to emulate kcopy */
+#define PSMI_KASSIST_MASK      0x7F
 
 #define PSMI_KASSIST_MODE_DEFAULT PSMI_KASSIST_KNEM_PUT
 #define PSMI_KASSIST_MODE_DEFAULT_STRING  "knem-put"
@@ -467,7 +468,8 @@ struct am_ctl_dirpage {
 #define AMSH_HAVE_KCOPY	0x01
 #define AMSH_HAVE_KNEM  0x02
 #define AMSH_HAVE_SCIF  0x04
-#define AMSH_HAVE_KASSIST 0x7
+#define AMSH_HAVE_CMA     0x08    /* using CMA API */
+#define AMSH_HAVE_KASSIST 0x0f
 
 /******************************************
  * Shared fifo element counts and sizes

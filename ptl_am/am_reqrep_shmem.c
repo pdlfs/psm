@@ -320,7 +320,7 @@ psmi_shm_attach(psm_ep_t ep, int *shmidx_o)
 {
     int ismaster = 1;
     int i;
-    int use_kcopy, use_kassist;
+    int use_kcopy, use_kassist, expected_features;
     int shmidx;
     int kcopy_minor = -1;
     char shmbuf[256];
@@ -565,7 +565,11 @@ psmi_shm_attach(psm_ep_t ep, int *shmidx_o)
      */
     pthread_mutex_lock((pthread_mutex_t *) &(ep->amsh_dirpage->lock));
     shmidx = -1;
+    expected_features = 0;  /* valid if i>0 */
     for (i = 0; i < PTL_AMSH_MAX_LOCAL_PROCS; i++) {
+        if (ep->amsh_dirpage->shmidx_map_epid[i]) {
+            expected_features = ep->amsh_dirpage->amsh_features[i];
+        }
 	if (ep->amsh_dirpage->shmidx_map_epid[i] == 0) {
 	    ep->amsh_dirpage->shmidx_map_epid[i] = 1;
             ep->amsh_dirpage->psm_verno[i] = PSMI_VERNO;
@@ -600,7 +604,11 @@ psmi_shm_attach(psm_ep_t ep, int *shmidx_o)
 		 * node can also use it. Advertise that KCOPY is active via
 		 * the feature flag.
 		 */
-		if (ep->psmi_kassist_fd >= 0) {
+                if (ep->psmi_kassist_mode & PSMI_KASSIST_KCOPY_CMA) {
+		  ep->amsh_dirpage->amsh_features[i] |= AMSH_HAVE_CMA;
+		  psmi_shm_mq_rv_thresh = PSMI_MQ_RV_THRESH_KCOPY;
+                }
+		else if (ep->psmi_kassist_fd >= 0) {
 		  ep->amsh_dirpage->amsh_features[i] |= AMSH_HAVE_KCOPY;
 		  psmi_shm_mq_rv_thresh = PSMI_MQ_RV_THRESH_KCOPY;
 		}
@@ -613,7 +621,17 @@ psmi_shm_attach(psm_ep_t ep, int *shmidx_o)
 	    }
 	    else
 	      psmi_shm_mq_rv_thresh = PSMI_MQ_RV_THRESH_NO_KASSIST;
-	    _IPATH_PRDBG("KASSIST MODE: %s\n", psmi_kassist_getmode(ep->psmi_kassist_mode));
+
+            if (i > 0 &&
+                expected_features != ep->amsh_dirpage->amsh_features[i]) {
+                 err = psmi_handle_error(NULL, PSM_INTERNAL_ERR,
+                "Error: feature mismatch across procs!");
+            }
+
+            if (getenv("PSM_AMSH_IDENTIFY")) {
+                fprintf(stderr, "KASSIST MODE: %s\n",
+                        psmi_kassist_getmode(ep->psmi_kassist_mode));
+            }
 #ifdef PSM_HAVE_SCIF
 	    _IPATH_PRDBG("SCIF DMA MODE: %s\n", psmi_scif_dma_getmode(ep->scif_dma_mode));
 	    _IPATH_PRDBG("SCIF DMA THRESHOLD: %d\n", ep->scif_dma_threshold);
@@ -2865,6 +2883,10 @@ static
 int
 psmi_kcopy_find_minor(int *minor)
 {
+#ifdef PSM_USE_CMA
+    *minor = -1;     /* CMA does not use a file descriptor */
+    return -1;
+#else
     int i;
     char path[128];
 
@@ -2887,6 +2909,7 @@ psmi_kcopy_find_minor(int *minor)
     }
 
     return fd;
+#endif
 }
 
 static
@@ -2918,6 +2941,10 @@ psmi_kassist_getmode(int mode)
 	    return "kcopy put";
 	case PSMI_KASSIST_KCOPY_GET:
 	    return "kcopy get";
+	case PSMI_KASSIST_KCOPY_PUT|PSMI_KASSIST_KCOPY_CMA:
+	    return "kcopy put (using CMA)";
+	case PSMI_KASSIST_KCOPY_GET|PSMI_KASSIST_KCOPY_CMA:
+	    return "kcopy get (using CMA)";
         case PSMI_KASSIST_KNEM_GET:
 	    return "knem get";
         case PSMI_KASSIST_KNEM_PUT:
@@ -2945,7 +2972,7 @@ psmi_get_kassist_mode()
       if (strcasecmp(s, "put") == 0)
 	mode = PSMI_KASSIST_KCOPY_PUT;
       else if (strcasecmp(s, "get") == 0)
-	mode = PSMI_KASSIST_KCOPY_PUT;
+	mode = PSMI_KASSIST_KCOPY_GET;
       else
 	mode = PSMI_KASSIST_OFF;
     }
@@ -2971,19 +2998,16 @@ psmi_get_kassist_mode()
 #if !defined(PSM_USE_KNEM)
       if (mode & PSMI_KASSIST_KNEM) {
       	_IPATH_ERROR("KNEM kassist mode requested which has not been compiled "
-		     "into this version of PSM. Switching kassist mode off.\n");
-      	mode = PSMI_KASSIST_OFF;
+                     "into this version of PSM. Switching kassist mode off.\n");
+        mode = PSMI_KASSIST_OFF;
       }
 #endif
     }
   else {
     
-#if defined(PSM_USE_KNEM)   
+    /* default ordering: CMA (emulating kcopy), KNEM, then KCOPY last. */
+#if defined(PSM_USE_KNEM) && !defined(PSM_USE_CMA)
     int res;
-    
-    /* KNEM is the preferred access mechanism if available. Else default to
-     * using KCOPY.
-     */
     res = access(KNEM_DEVICE_FILENAME, R_OK | W_OK);
     if (res == 0)
       mode = PSMI_KASSIST_KNEM_PUT;
@@ -2993,6 +3017,19 @@ psmi_get_kassist_mode()
     mode = PSMI_KASSIST_KCOPY_PUT;
 #endif
   }
+
+#ifdef PSM_USE_CMA
+  if (mode & PSMI_KASSIST_KCOPY) {
+    if (kcopy_cma_is_ok()) {
+        mode |= PSMI_KASSIST_KCOPY_CMA;   /* using CMA to emulate KCOPY */
+    } else {
+        _IPATH_ERROR("KCOPY/CMA kassist mode requested but CMA failed. "
+                     "Switching kassist mode off.\n");
+        mode = PSMI_KASSIST_OFF;
+
+    }
+  }
+#endif
 
   return mode;
 }
