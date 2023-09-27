@@ -135,6 +135,7 @@ static int psmi_get_scif_dma_threshold();
 
 /* Kcopy functionality */
 int psmi_epaddr_kcopy_pid(psm_epaddr_t epaddr);
+static void psmi_epaddr_kcopy_syncpid(psm_epaddr_t epaddr);
 static int psmi_kcopy_find_minor(int *minor);
 static int psmi_kcopy_open_minor(int minor);
 
@@ -1578,6 +1579,9 @@ amsh_ep_connreq_poll(ptl_t *ptl, struct ptl_connection_req *req)
             if (cstate == AMSH_CSTATE_TO_REPLIED) {
                 req->numep_left--;
                 AMSH_CSTATE_TO_SET(epaddr, ESTABLISHED);
+                if (epaddr->ep->psmi_kassist_mode & PSMI_KASSIST_KCOPY) {
+                    psmi_epaddr_kcopy_syncpid(epaddr);
+                }
                 req->epid_mask[i] = AMSH_CMASK_DONE;
                 continue;
             }
@@ -1712,6 +1716,10 @@ amsh_ep_connreq_fini(ptl_t *ptl, struct ptl_connection_req *req)
             if (cstate == AMSH_CSTATE_TO_REPLIED) {
                 req->numep_left--;
                 AMSH_CSTATE_TO_SET(req->epaddr[i], ESTABLISHED);
+                if (req->epaddr[i]->ep->psmi_kassist_mode &
+                                                        PSMI_KASSIST_KCOPY) {
+                    psmi_epaddr_kcopy_syncpid(req->epaddr[i]);
+                }
             }
             else { /* never actually got reply */
                 req->errors[i] = PSM_TIMEOUT;
@@ -2879,6 +2887,44 @@ psmi_epaddr_kcopy_pid(psm_epaddr_t epaddr)
     return epaddr->ep->amsh_qdir[shmidx].kassist_pid;
 }
 
+/*
+ * we called am_update_directory(ptl, shmidx) for all shmidx values
+ * during amsh_init_segment() to init our private data cache in
+ * ep->amsh_qdir[] from the shared amsh_dirpage area.  but when
+ * using kcopy the value of amsh_dirpage->kassist_pids[shmidx] for
+ * other processes may not have been set yet by those processes
+ * (it is a race, so it may still be zero).  this function updates
+ * the copy of pid in amsh_qdir[] from the master value in amsh_dirpage.
+ * we call it when a new amsh connection is established.
+ * knem does not need this, as its API uses cookies rather than pids.
+ */
+static
+void
+psmi_epaddr_kcopy_syncpid(psm_epaddr_t epaddr) {
+    psm_ep_t ep = epaddr->ep;
+    int shmidx = epaddr->_shmidx;
+
+    /*
+     * not locking amsh_dirpage here.  we only call this for established
+     * connections (so the kassist_pids[shmidx] value is already set
+     * and won't change for the lifetime of the connection).
+     *
+     * XXX: tried doing the lock, but the n_prereq code at the end of
+     * amsh_ep_connreq_poll() calls psmi_amsh_short_request() while
+     * holding the lock and that can loop around to us causing a deadlock.
+     *
+     *   amsh_ep_connreq_poll               # takes lock
+     *     psmi_amsh_short_request
+     *       psmi_amsh_generic_inner
+     *         amsh_conn_handler
+     *           psmi_epaddr_kcopy_syncpid  # deadlock
+     *
+     * maybe it isn't such a good idea to start an am request with
+     * psmi_amsh_short_request() while holding that lock?
+     */
+    ep->amsh_qdir[shmidx].kassist_pid = ep->amsh_dirpage->kassist_pids[shmidx];
+}
+
 static
 int
 psmi_kcopy_find_minor(int *minor)
@@ -3147,6 +3193,9 @@ amsh_conn_handler(void *toki, psm_amarg_t *args, int narg, void *buf, size_t len
             args[1].u64w0 = (psm_epid_t) ptl->epid;
             args[2].u32w1 = PSM_OK;
             AMSH_CSTATE_FROM_SET(epaddr, ESTABLISHED);
+            if (epaddr->ep->psmi_kassist_mode & PSMI_KASSIST_KCOPY) {
+                psmi_epaddr_kcopy_syncpid(epaddr);
+            }
             tok->tok.epaddr_from = epaddr; /* adjust token */
             psmi_amsh_short_reply(tok, amsh_conn_handler_hidx, 
                                   args, narg, NULL, 0, 0);
