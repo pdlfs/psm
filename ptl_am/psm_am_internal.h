@@ -469,7 +469,8 @@ struct am_ctl_dirpage {
 #define AMSH_HAVE_KNEM  0x02
 #define AMSH_HAVE_SCIF  0x04
 #define AMSH_HAVE_CMA     0x08    /* using CMA API */
-#define AMSH_HAVE_KASSIST 0x0f
+#define AMSH_HAVE_PUT     0x10    /* using PUT with kassist kcopy/knem/cma */
+#define AMSH_HAVE_KASSIST 0x1f
 
 /******************************************
  * Shared fifo element counts and sizes

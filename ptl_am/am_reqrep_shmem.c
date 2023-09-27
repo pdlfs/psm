@@ -321,7 +321,7 @@ psmi_shm_attach(psm_ep_t ep, int *shmidx_o)
 {
     int ismaster = 1;
     int i;
-    int use_kcopy, use_kassist, expected_features;
+    int use_kcopy, use_kassist, put_flag, expected_features;
     int shmidx;
     int kcopy_minor = -1;
     char shmbuf[256];
@@ -376,6 +376,7 @@ psmi_shm_attach(psm_ep_t ep, int *shmidx_o)
     ep->psmi_kassist_mode = psmi_get_kassist_mode();
     use_kassist = (ep->psmi_kassist_mode != PSMI_KASSIST_OFF);
     use_kcopy = (ep->psmi_kassist_mode & PSMI_KASSIST_KCOPY);
+    put_flag = (ep->psmi_kassist_mode & PSMI_KASSIST_PUT) ? AMSH_HAVE_PUT : 0;
 
 #ifdef PSM_HAVE_SCIF
     ep->scif_dma_mode = psmi_get_scif_dma_mode();
@@ -586,7 +587,8 @@ psmi_shm_attach(psm_ep_t ep, int *shmidx_o)
 		 * the feature flag.
 		 */
 		if (ep->psmi_kassist_fd >= 0) {
-		  ep->amsh_dirpage->amsh_features[i] |= AMSH_HAVE_KNEM;
+		  ep->amsh_dirpage->amsh_features[i] |=
+                      (AMSH_HAVE_KNEM | put_flag);
 		  psmi_shm_mq_rv_thresh = PSMI_MQ_RV_THRESH_KNEM;
 		}
 		else {
@@ -606,11 +608,13 @@ psmi_shm_attach(psm_ep_t ep, int *shmidx_o)
 		 * the feature flag.
 		 */
                 if (ep->psmi_kassist_mode & PSMI_KASSIST_KCOPY_CMA) {
-		  ep->amsh_dirpage->amsh_features[i] |= AMSH_HAVE_CMA;
+		  ep->amsh_dirpage->amsh_features[i] |=
+                      (AMSH_HAVE_CMA | put_flag);
 		  psmi_shm_mq_rv_thresh = PSMI_MQ_RV_THRESH_KCOPY;
                 }
 		else if (ep->psmi_kassist_fd >= 0) {
-		  ep->amsh_dirpage->amsh_features[i] |= AMSH_HAVE_KCOPY;
+		  ep->amsh_dirpage->amsh_features[i] |=
+                      (AMSH_HAVE_KCOPY | put_flag);
 		  psmi_shm_mq_rv_thresh = PSMI_MQ_RV_THRESH_KCOPY;
 		}
 		else {
