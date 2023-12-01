@@ -73,7 +73,7 @@ int psmi_scif_connect_retries = PSM_SCIF_CONNECT_RETRIES_DEFAULT;
 
 /*       short med long huge */
 static const amsh_qinfo_t amsh_qcounts =
-        { 1024, 256, 16, 1, 1024, 256, 16, 8 };
+        { 1024, 512, 256, 1, 1024, 512, 256, 8 };
 
 /*        short                   med          long       huge */
 static const amsh_qinfo_t amsh_qelemsz =
