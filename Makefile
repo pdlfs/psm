@@ -145,6 +145,7 @@ ${TARGLIB}-objs := ptl_am/am_reqrep_shmem.o	\
 		   ptl_ips/ips_path_rec.o       \
 		   ptl_ips/ips_opp_path_rec.o   \
 		   ptl_ips/ips_writehdrq.o	\
+		   ptl_ips/time_util.o \
 		   ptl_self/ptl.o		\
 		   psm_diags.o
 
@@ -275,7 +276,7 @@ ${TARGLIB}.so.${MAJOR}.${MINOR}: ${${TARGLIB}-objs}
 	$(CC) $(LDFLAGS) -o $@ -Wl,-soname=${TARGLIB}.so.${MAJOR} -shared -Wl,--unique='*fastpath*' \
 		${${TARGLIB}-objs} _revision.o -L$(build_dir)/ipath $(LDLIBS)
 	@leaks=`nm $@ | grep ' [DT] ' | \
-	 grep -v -e ' [DT] \(_edata\|_fini\|_init\|infinipath_\|ips_\|psmi\|__psm_\|__psmi_\|_rest.pr\|_save.pr\|kcopy\|knem\|scif\)'`; \
+	 grep -v -e ' [DT] \(_edata\|_fini\|_init\|infinipath_\|ips_\|psmi\|__psm_\|__psmi_\|_rest.pr\|_save.pr\|kcopy\|knem\|scif\|mark_\)'`; \
 	 if test -n "$$leaks"; then echo "Build failed, leaking symbols:"; echo "$$leaks"; exit 1; fi
 
 %.o: %.c

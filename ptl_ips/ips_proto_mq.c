@@ -37,6 +37,10 @@
 #include "ips_proto.h"
 #include "ips_proto_internal.h"
 
+#include "time_util.h"
+
+#include <inttypes.h>
+
 #define MQ_NUM_MTUS(size,mtu)	(((size) + (mtu) - 1) / (mtu))
 #define MQ_EGRLONG_ENABLE_MULTIFLOW 0
 
@@ -218,6 +222,8 @@ ips_mq_send_payload(psm_epaddr_t epaddr, psmi_egrid_t egrid,
     do {
 	scb = mq_alloc_pkts(proto, 1, 0, 0);
 	psmi_assert(scb != NULL);
+
+  mark_begin(scb);
 
 #if 0
 	/* turn on to use single frag-size packet */
@@ -405,6 +411,7 @@ ips_proto_mq_isend(psm_mq_t mq, psm_epaddr_t mepaddr, uint32_t flags,
 	     uint64_t tag, const void *ubuf, uint32_t len, void *context,
 	     psm_mq_req_t *req_o)
 {
+
     uint8_t *buf = (uint8_t *) ubuf;
     uint32_t pktlen = 0;
     ips_scb_t *scb;
@@ -424,6 +431,7 @@ ips_proto_mq_isend(psm_mq_t mq, psm_epaddr_t mepaddr, uint32_t flags,
 
     if (!flags && len <= MQ_IPATH_THRESH_TINY) {
 	scb = mq_alloc_tiny(proto);
+  mark_begin(scb);
 	ips_scb_subopcode(scb) = OPCODE_SEQ_MQ_HDR;
 	ips_scb_hdr_dlen(scb) = len;
 	ips_scb_mqhdr(scb) = MQ_MSG_TINY;
@@ -460,6 +468,7 @@ ips_proto_mq_isend(psm_mq_t mq, psm_epaddr_t mepaddr, uint32_t flags,
 	  pad_write_bytes = 0;
 	scb = mq_alloc_pkts(proto, 1, (len + pad_write_bytes),
 			    IPS_SCB_FLAG_ADD_BUFFER);
+  mark_begin(scb);
 	ips_scb_subopcode(scb) = OPCODE_SEQ_MQ_CTRL;
 	ips_scb_hdr_dlen(scb) = pad_write_bytes;
 	ips_scb_length(scb) = len + pad_write_bytes;
@@ -478,6 +487,7 @@ ips_proto_mq_isend(psm_mq_t mq, psm_epaddr_t mepaddr, uint32_t flags,
 	psmi_egrid_t egrid;
 
 	scb = mq_alloc_pkts(proto, 1, 0, 0);
+  mark_begin(scb);
 	/* directly send from user's buffer */
 	ips_scb_buffer(scb) = buf;
 
@@ -512,7 +522,7 @@ ips_proto_mq_isend(psm_mq_t mq, psm_epaddr_t mepaddr, uint32_t flags,
 	    }
 	}
 	psmi_assert(pktlen <= ipsaddr->epr.epr_piosize);
-	
+
 	ips_scb_length(scb) = pktlen;
 	ips_scb_subopcode(scb) = OPCODE_SEQ_MQ_CTRL;
 	ips_scb_mqhdr(scb) = MQ_MSG_LONG;

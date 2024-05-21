@@ -37,6 +37,10 @@
 #include "ips_proto.h"
 #include "ips_proto_internal.h"
 
+#include "time_util.h"
+
+#include <inttypes.h>
+
 #define PSM_STRAY_WARN_INTERVAL_DEFAULT_SECS	30
 static void ips_report_strays(struct ips_proto *proto);
 
@@ -519,6 +523,8 @@ ips_proto_process_ack(struct ips_recvhdrq_event *rcv_ev)
 	STAILQ_REMOVE_HEAD(unackedq, nextq);
 	flow->scb_num_unacked--;
 	flow->credits++;
+
+  mark_end(scb);
 	
 	if (scb == SLIST_FIRST(scb_pend)) {
 	    flow->scb_num_pending--;

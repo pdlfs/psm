@@ -35,6 +35,8 @@
 #include <dlfcn.h>
 #include "psm_user.h"
 
+#include "ptl_ips/time_util.h"
+
 static int psmi_verno_major = PSM_VERNO_MAJOR;
 static int psmi_verno_minor = PSM_VERNO_MINOR;
 static int psmi_verno = PSMI_VERNO_MAKE(PSM_VERNO_MAJOR, PSM_VERNO_MINOR);
@@ -266,6 +268,8 @@ __psm_init(int *major, int *minor)
 
     psmi_epid_init();
 
+    mark_init();
+
 update:
     *major = (int) psmi_verno_major;
     *minor = (int) psmi_verno_minor;
@@ -291,6 +295,8 @@ __psm_finalize(void)
 	    2*PSMI_MIN_EP_CLOSE_TIMEOUT);
 	ep = psmi_opened_endpoint;
     }
+
+    mark_destroy();
 
     psmi_epid_fini();
 

@@ -36,7 +36,7 @@ INCLUDES += -I$(top_srcdir) -I$(top_srcidr)/ptl_ips
 ${TARGLIB}-objs := ptl.o ptl_rcvthread.o ips_proto.o ipserror.o ips_recvq.o \
 		   ips_recvhdrq.o ips_spio.o ips_proto_recv.o ips_proto_connect.o \
 		   ips_proto_dump.o ips_proto_mq.o ips_subcontext.o \
-		   ips_writehdrq.o ips_proto_expected.o ips_tid.o
+		   ips_writehdrq.o ips_proto_expected.o ips_tid.o time_util.o
 
 # enable mov,0 -> xor optimization for ips
 ifeq (${CCARCH},pathcc)
