@@ -106,6 +106,10 @@ static __inline__ uint32_t ips_cmpxchg(volatile uint32_t *ptr,
     uint32_t prev;
     struct xchg_dummy { uint32_t a[100]; };
 
+// Superfluous array-bounds warning; suppress
+// https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=984057
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Warray-bounds"
     asm volatile(LOCK_PREFIX "cmpxchgl %1,%2"
 		 : "=a"(prev)
 		 : "q"(new), "m"(*(struct xchg_dummy *)ptr), "0"(old)
