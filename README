@@ -33,6 +33,19 @@
  
 ================================================================================
 
+This is the github pdlfs fork of the orig psm library.
+
+Hardware Note
+-------------
+If you attempt to run psm on older hardware with newer linux kernels and
+it either crashes in psm_init() with "Hardware Error" or the kernel
+SIGKILLS your process and logs a "corrupted page table" error in dmesg,
+then your system likely has buggy Intel IOMMU hardware.  Newer kernels
+have Intel IOMMU enabled by default, older ones do not.  You can
+resolve this problem by putting "intel_iommu=off" in your kernel boot
+options (e.g. with grub).   (It is also possible that BIOS updates may
+help?)
+
 OFED Support
 ------------
 OFED 3.5 or above should be installed on the node. Prior versions of OFED
